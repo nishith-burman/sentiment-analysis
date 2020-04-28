@@ -1,0 +1,226 @@
+---
+title: "Project Major NM"
+author: "Group - 1"
+date: "April 14, 2019"
+output: word_document
+---
+
+```{r 1}
+library(tm)
+library(e1071)
+library(dplyr)
+library(caret)
+library(ggplot2)
+library(tidyverse)
+library(textclean)
+library(RCurl)
+library(tidytext)
+library(tidyr)
+library(magrittr)
+library(RColorBrewer)
+library(wordcloud)
+library(caTools)
+```
+
+### Loading the Data set
+```{r 2}
+reviews_original <- read.csv(file.choose(), header = TRUE, stringsAsFactors = F )
+```
+
+### Data Wrangling and Data cleaning
+```{r 3}
+reviews <- reviews_original[c(2,11)]
+colnames(reviews) <- c("sentiment", "tweet")
+glimpse(reviews)
+set.seed(1)
+reviews<-reviews[sample(nrow(reviews)),]
+reviews<-reviews[sample(nrow(reviews)),]
+glimpse(reviews)
+reviews$sentiment <- as.factor(reviews$sentiment)
+
+reviews_text <- reviews$tweet
+reviews_text <- replace_emoji(reviews_text)
+reviews_text <- replace_non_ascii(reviews_text)
+
+corpus <- Corpus(VectorSource(reviews_text))
+inspect(corpus[1:3])
+
+
+corpus_clean <- corpus %>%
+  tm_map(content_transformer(tolower)) %>% 
+  tm_map(removePunctuation) %>%
+  tm_map(removeNumbers) %>%
+  tm_map(removeWords, stopwords(kind="en")) %>%
+  tm_map(removeWords, c("virginamerica", "united", "flight","jetblue",
+                          "usairways","americanair","southwestair","get")) %>%    
+  tm_map(stripWhitespace)
+inspect(corpus_clean[1:19])
+dtm <- DocumentTermMatrix(corpus_clean)
+inspect(dtm[40:50, 10:15])
+```
+
+### Data Exploration and Data Visualization
+
+```{r 4}
+reviews_original <- read.csv(file.choose(), stringsAsFactors = F)
+reviews1 <- reviews_original
+#reviews <- reviews_original[c(2,6,11)]
+str(reviews1)
+
+table(reviews1$airline_sentiment)
+# So there are 2363 positive and 9178 negative reviews in out dataset
+
+#reviews$text <- as.character(reviews$text)
+#reviews_clean <- reviews %>%  unnest_tokens(word, text)
+
+summary(reviews1$airline_sentiment)
+
+
+barplot <- ggplot(reviews1, aes(x = airline_sentiment, fill = airline_sentiment)) +
+  geom_bar(color="black") +
+  facet_grid(. ~ airline) +
+  theme(axis.text.x = element_text(angle=65, vjust=0.6),
+        plot.margin = unit(c(3,0,3,0), "cm"))
+barplot + scale_fill_brewer(palette="Oranges")
+
+#datacleaning and exploring
+
+### postive
+
+positive.reviews <- reviews1 %>% filter( airline_sentiment == "positive")
+positive.text <- positive.reviews$text
+#positive.text <- unnest_tokens(positive.text)
+positive.text <-replace_emoji(positive.text)
+positive.text <- replace_non_ascii(positive.text)
+
+positive.corpus <- gsub("http.*","",positive.text)
+positive.corpus <- Corpus(VectorSource(positive.corpus))
+
+positive.corpus <- tm_map(positive.corpus, removePunctuation)
+positive.corpus <- tm_map(positive.corpus, stripWhitespace)
+positive.corpus <- tm_map(positive.corpus, content_transformer(tolower))
+positive.corpus <- tm_map(positive.corpus, removeNumbers)
+positive.corpus <- tm_map(positive.corpus, removeWords, stopwords("english"))
+positive.corpus <- tm_map(positive.corpus, removeWords, c("virginamerica", "united",                              "flight","jetblue","usairways","americanair","southwestair","get",
+                "hour","can","will","amp",'cant',"one",
+                "thank","flighted"))
+positive.corpus <-  tm_map(positive.corpus, stripWhitespace)
+inspect(positive.corpus[1:5])
+
+positiveTDM <- TermDocumentMatrix(positive.corpus)
+positiveTDM
+
+matrix.positive <- as.matrix(positiveTDM) #matric of tdm
+sorting.positive <- sort(rowSums(matrix.positive),decreasing = T) #sorting
+dataframe.positive <- data.frame(word=names(sorting.positive),freq=sorting.positive) #frequency of words used
+
+
+Spectral <- brewer.pal(8,"Spectral")
+DarkColor <- brewer.pal(8,"Dark2")
+barplot(dataframe.positive[1:20,]$freq, las = 2, 
+        names.arg = dataframe.positive[1:20,]$word,
+        col =Spectral, main ="Most frequent words",
+        ylab = "Word frequencies")
+
+wordcloud(dataframe.positive$word,dataframe.positive$freq, scale=c(3,0.5), max.words=2000, random.order=FALSE, rot.per=0.4, 
+          colors=DarkColor,use.r.layout=T)
+
+#negative
+
+negative.reviews <- reviews1 %>% filter( airline_sentiment == "negative")
+negative.text <- negative.reviews$text
+#negative.text <- unnest_tokens(negative.text)
+negative.text <-replace_emoji(negative.text)
+negative.text <- replace_non_ascii(negative.text)
+
+negative.corpus <- gsub("http.*","",negative.text)
+negative.corpus <- Corpus(VectorSource(negative.corpus))
+
+negative.corpus <- tm_map(negative.corpus, removePunctuation)
+negative.corpus <- tm_map(negative.corpus, stripWhitespace)
+negative.corpus <- tm_map(negative.corpus, content_transformer(tolower))
+negative.corpus <- tm_map(negative.corpus, removeNumbers)
+negative.corpus <- tm_map(negative.corpus, removeWords, stopwords("english"))
+negative.corpus <- tm_map(negative.corpus, removeWords, c("virginamerica", "united",                                 "flight","jetblue","usairways","americanair","southwestair","get",
+                    "hour","can","will","amp",'cant',"one",
+                    "thank","flighted"))
+negative.corpus <-  tm_map(negative.corpus, stripWhitespace)
+inspect(negative.corpus[1:5])
+
+negativeTDM <- TermDocumentMatrix(negative.corpus)
+negativeTDM
+
+matrix.negative <- as.matrix(negativeTDM) #matric of tdm
+sorting.negative <- sort(rowSums(matrix.negative),decreasing = T) #sorting
+dataframe.negative <- data.frame(word=names(sorting.negative),freq=sorting.negative) #frequency of words used
+
+
+Set1 <- brewer.pal(8,"Set1")
+Blues <- brewer.pal(6,"Blues")
+barplot(dataframe.negative[1:20,]$freq, las = 2, 
+        names.arg = dataframe.negative[1:20,]$word,
+        col =Set1, main ="Most frequent words",
+        ylab = "Word frequencies")
+
+wordcloud(dataframe.negative$word,dataframe.negative$freq, scale=c(3,0.5), max.words=200, random.order=FALSE, colors=Blues,use.r.layout=T)
+
+
+``` 
+
+### Formation of training and validation set
+```{r 5}
+reviews.train <- reviews[1:9232,]
+reviews.test <- reviews[9233:11541,]
+
+dtm.train <- dtm[1:9232,]
+dtm.test <- dtm[9233:11541,]
+
+
+corpus.clean.train <- corpus_clean[1:9232]
+corpus.clean.test <- corpus_clean[9233:11541]
+
+
+dim(dtm.train)
+
+fivefreq <- findFreqTerms(dtm.train, 5)
+length((fivefreq))
+
+dtm.train.nb <- DocumentTermMatrix(corpus.clean.train,
+                                   control=list(dictionary = fivefreq))
+dim(dtm.train.nb)
+dtm.test.nb <- DocumentTermMatrix(corpus.clean.test,
+                                  control=list(dictionary = fivefreq))
+dim(dtm.test.nb)
+convert_count <- function(x) {
+  y <- ifelse(x > 0, 1,0)
+  y <- factor(y, levels=c(0,1), labels=c("No", "Yes"))
+  y
+}
+trainNB <- apply(dtm.train.nb, 2, convert_count)
+testNB <- apply(dtm.test.nb, 2, convert_count)
+```
+
+### Naive Bayes ML Algorithm
+```{r 6}
+classifier <- naiveBayes(trainNB, reviews.train$sentiment, laplace = 1)
+pred <- predict(classifier, newdata=testNB)
+
+table("Predictions"= pred,  "Actual" = reviews.test$sentiment )                 
+conf.mat <- confusionMatrix(pred, reviews.test$sentiment)
+conf.mat
+conf.mat$byClass
+conf.mat$overall
+conf.mat$overall['Accuracy']
+```
+
+### Support Vector Mechanism
+```{r 7}
+svm_classifier <- svm(dtm.train.nb,reviews.train$sentiment,kernel = "linear")
+predSvm <- predict(svm_classifier,newdata = dtm.test.nb)
+conf.mat1 <- confusionMatrix(predSvm, reviews.test$sentiment)
+conf.mat1
+conf.mat1$overall['Accuracy']
+```
+
+
+
